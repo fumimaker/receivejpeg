@@ -1,16 +1,19 @@
-#include <jpeglib.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <jpeglib.h>
 
 #define HEIGHT 720
 #define WIDTH 1280
-
+#define DEPTH 3
 #define in_file_name "input.jpg"
 
 int main() {
     struct jpeg_decompress_struct in_info;
     struct jpeg_error_mgr jpeg_error;
+    JSAMPROW buffer = NULL;
+    JSAMPROW row;
+
     in_info.err = jpeg_std_error(&jpeg_error);
 
     FILE *infile;
@@ -27,37 +30,33 @@ int main() {
 
     printf("in_info.output_height:%d in_info.output_components:%d\n",
            in_info.output_height, in_info.output_components);
-    printf("JSAMPARRAY:%d JSAMPROW:%d JSAMPLE:%d\n", sizeof(JSAMPARRAY),
-           sizeof(JSAMPROW), sizeof(JSAMPLE));
 
-    // 展開用メモリの確保
-    JSAMPARRAY buffer =
-        (JSAMPARRAY)malloc(sizeof(JSAMPROW) * in_info.output_height);
-    for (int i = 0; i < in_info.output_height; ++i) {
-        buffer[i] = (JSAMPROW)calloc(
-            sizeof(JSAMPLE), in_info.output_width * in_info.output_components);
+    int stride =
+        sizeof(JSAMPLE) * in_info.output_width * in_info.output_components;
+    printf("stride:%d \n", stride);
+
+    if ((buffer = (unsigned char *)calloc(stride, 1)) == NULL) {
+        perror("calloc error");
     }
 
-    // 画像のスキャン
-    while (in_info.output_scanline < in_info.output_height) {
-        jpeg_read_scanlines(&in_info, buffer + in_info.output_scanline,
-                            in_info.output_height - in_info.output_scanline);
-    }
+    unsigned char img[WIDTH * HEIGHT * DEPTH];
 
+    for (int i = 0; i < in_info.output_height; i++) {
+        jpeg_read_scanlines(&in_info, &buffer, 1);
+        row = buffer;
+
+        for (int k = 0; k < stride; k++) {
+            img[k + i * stride] = *row++;
+            // printf("height:%d width:%d addr:%d data:0x%06x\n", i, k, k + i * stride, img[k + i*stride]);
+        }
+    }
+    jpeg_finish_decompress(&in_info);
+    jpeg_destroy_decompress(&in_info);
+    free(buffer);
     FILE *file;
     file = fopen("test.raw", "wb");
-    JSAMPARRAY img = (JSAMPARRAY)malloc(sizeof(JSAMPROW) * HEIGHT);
-    for (int i = 0; i < HEIGHT; i++) {
-        img[i] = (JSAMPROW)calloc(sizeof(JSAMPLE),
-                                  WIDTH * in_info.output_components);
-        memcpy(img[i], buffer[i], WIDTH * in_info.output_components);
-
-        fwrite(img, 1, sizeof(img), file);
-        fclose(file);
-
-        jpeg_finish_decompress(&in_info);
-        jpeg_destroy_decompress(&in_info);
-        fclose(infile);
-    }
+    fwrite(img, 1, WIDTH * HEIGHT * DEPTH, file);
+    fclose(file);
+    fclose(infile);
     return 0;
 }
