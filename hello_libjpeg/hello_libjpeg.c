@@ -1,42 +1,63 @@
 #include <stdio.h>
 #include <jpeglib.h>
 #include <stdlib.h>
+#include <string.h>
+
+#define HEIGHT 720
+#define WIDTH 1280
+
+#define in_file_name "input.jpg"
 
 int main (){
-    // 構造体確保
-    struct jpeg_decompress_struct cinfo;
-    jpeg_create_decompress(&cinfo);
-    struct jpeg_error_mgr jerr;
-	cinfo.err = jpeg_std_error(&jerr);
+    struct jpeg_decompress_struct in_info;
+    struct jpeg_error_mgr jpeg_error;
+    in_info.err = jpeg_std_error(&jpeg_error);
 
-    // 入力ファイル指定
-    FILE *fp = fopen("./input.jpg", "rb");
-    jpeg_stdio_src(&cinfo, fp);
-
-    // ヘッダ情報取得
-    jpeg_read_header(&cinfo, TRUE);
-    int width = cinfo.image_width;
-    int height = cinfo.image_height;
-    int ch = cinfo.num_components;
-
-    // データ読み込み
-    jpeg_start_decompress(&cinfo);
-
-    // 画像データ格納する配列を動的確保
-    JSAMPARRAY *data =
-        (JSAMPARRAY *)malloc(sizeof(JSAMPLE) * width * height * ch);
-    JSAMPROW *row = data;
-
-    // 列単位でデータを格納
-    for (int y = 0; y < height; y++) {
-        jpeg_read_scanlines(&cinfo, &row, 1);
-        row += width * ch;
+    FILE *infile;
+    if ((infile = fopen(in_file_name, "rb")) == NULL) {
+        fprintf(stderr, "ファイルが開けません: %s\n", in_file_name);
+        return -1;
     }
 
-    // 構造体破棄
-    jpeg_finish_decompress(&cinfo);
-    jpeg_destroy_decompress(&cinfo);
-    fclose(fp);
+    jpeg_create_decompress(&in_info);
+    jpeg_stdio_src(&in_info, infile);
 
-    return 0;
+    jpeg_read_header(&in_info, TRUE);
+    jpeg_start_decompress(&in_info);
+
+
+    printf("in_info.output_height:%d in_info.output_components:%d\n",
+           in_info.output_height, in_info.output_components);
+    printf("JSAMPARRAY:%d JSAMPROW:%d JSAMPLE:%d\n", sizeof(JSAMPARRAY), sizeof(JSAMPROW), sizeof(JSAMPLE));
+
+        // 展開用メモリの確保
+        JSAMPARRAY buffer =
+            (JSAMPARRAY)malloc(sizeof(JSAMPROW) * in_info.output_height);
+    for (int i = 0; i < in_info.output_height; ++i) {
+        buffer[i] = (JSAMPROW)calloc(
+            sizeof(JSAMPLE), in_info.output_width * in_info.output_components);
+    }
+
+    // 画像のスキャン
+    while (in_info.output_scanline < in_info.output_height) {
+        jpeg_read_scanlines(&in_info, buffer + in_info.output_scanline,
+                            in_info.output_height - in_info.output_scanline);
+    }
+
+    FILE *file;
+    file = fopen("test.raw", "wb");
+    JSAMPARRAY img = (JSAMPARRAY)malloc(sizeof(JSAMPROW) * HEIGHT);
+    for (int i = 0; i < HEIGHT; i++) {
+        img[i] = (JSAMPROW)calloc(sizeof(JSAMPLE),
+                                  WIDTH * in_info.output_components);
+        memcpy(img[i], buffer[i], WIDTH * in_info.output_components);
+
+        fwrite(img, 1, sizeof(img), file);
+        fclose(file);
+
+        jpeg_finish_decompress(&in_info);
+        jpeg_destroy_decompress(&in_info);
+        fclose(infile);
+	}
+	return 0;
 }
