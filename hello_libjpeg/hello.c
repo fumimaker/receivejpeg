@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include <jpeglib.h>
 #include <stdlib.h>
@@ -7,6 +8,10 @@
 #define WIDTH 1280
 
 #define in_file_name "input.jpg"
+
+
+////////////// NOT WORKING ////////////
+
 
 int main (){
     struct jpeg_decompress_struct in_info;
