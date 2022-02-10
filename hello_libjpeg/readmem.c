@@ -62,9 +62,11 @@ int main() {
     sizeofheader = sb.st_size;
     fread(headerbuffer, sizeof(unsigned char), sizeofheader, fp_header);
     printf("sizeofheader:%d bytes\n", sizeofheader);
+    gettimeofday(&start_time, NULL);
+
     memcpy(mem, headerbuffer, sizeofheader);
 
-    gettimeofday(&start_time, NULL);
+
     for(int i=90; i<180; i++){
         char moji[32];
         sprintf(moji, "bininput/%04d.bin", i);

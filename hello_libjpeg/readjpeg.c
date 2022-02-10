@@ -10,7 +10,7 @@
 #define HEIGHT 720
 #define WIDTH 1280
 #define DEPTH 3
-#define in_file_name "input.jpg"
+#define in_file_name "nekomaru720.jpg"
 
 void print_diff_time(struct timeval start_time, struct timeval end_time) {
     struct timeval diff_time;
