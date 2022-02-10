@@ -65,25 +65,9 @@ int main(int argc, char **argv){
         fprintf(stderr, "cannot get framebuffer");
         exit(1);
     }
-    int casenum = xres / 8;
     int color;
     for(int y=0; y<yres; y++){
         for(int x=0; x<xres; x++){
-            // if(x<casenum) {
-            //     color = 0x00FFFFFF;
-            // } else if(x<casenum*2) {
-            //     color = 0x00FFFF00;
-            // } else if(x<casenum*3) {
-            //     color = 0x0000FFFF;
-            // } else if(x<casenum*4) {
-            //     color = 0x00FF00FF;
-            // } else if(x<casenum*5) {
-            //     color = 0x00FF0000;
-            // } else if(x<casenum*6) {
-            //     color = 0x000000FF;
-            // } else if(x<casenum*7) {
-            //     color = 0x00000000;
-            // }
             int pattern = x/(xres/8);
             switch(pattern){
                 case 0:
@@ -127,7 +111,7 @@ int main(int argc, char **argv){
     //         b = 0;
     //     }
     // }
-    //msync(buf, screensize, 0);
+    msync(buf, screensize, 0);
     munmap(buf, screensize);
     close(fd);
     return 0;
