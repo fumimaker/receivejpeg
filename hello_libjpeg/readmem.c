@@ -15,20 +15,26 @@ int main() {
     JSAMPROW buffer = NULL;
     JSAMPROW row;
     struct stat sb;
+    int sizeofjpeg;
 
     unsigned char jpegbuffer[0x100000];//1MByte
-
-
     in_info.err = jpeg_std_error(&jpeg_error);
 
-    FILE *infile;
-    if ((infile = fopen(in_file_name, "rb")) == NULL) {
-        fprintf(stderr, "ファイルが開けません: %s\n", in_file_name);
+    FILE *fp = fopen(in_file_name, "rb");
+    if (fp == NULL) {
+        printf("no file.\n");
         return -1;
     }
 
+    if (stat(in_file_name, &sb) == -1) {
+        perror("stat");
+        exit(EXIT_FAILURE);
+    }
+    sizeofjpeg = sb.st_size;
+    fread(jpegbuffer, sizeof(unsigned char), sizeofjpeg, fp);
+
     jpeg_create_decompress(&in_info);
-    jpeg_stdio_src(&in_info, infile);
+    jpeg_mem_src(&in_info, jpegbuffer, sizeofjpeg);
 
     jpeg_read_header(&in_info, TRUE);
     jpeg_start_decompress(&in_info);
@@ -62,6 +68,6 @@ int main() {
     file = fopen("test.raw", "wb");
     fwrite(img, 1, WIDTH * HEIGHT * DEPTH, file);
     fclose(file);
-    fclose(infile);
+    fclose(fp);
     return 0;
 }
