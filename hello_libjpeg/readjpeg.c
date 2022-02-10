@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <jpeglib.h>
+#include <sys/stat.h>
 
 #define HEIGHT 720
 #define WIDTH 1280
@@ -13,6 +14,10 @@ int main() {
     struct jpeg_error_mgr jpeg_error;
     JSAMPROW buffer = NULL;
     JSAMPROW row;
+    struct stat sb;
+
+    unsigned char jpegbuffer[0x100000];//1MByte
+
 
     in_info.err = jpeg_std_error(&jpeg_error);
 
@@ -21,6 +26,7 @@ int main() {
         fprintf(stderr, "ファイルが開けません: %s\n", in_file_name);
         return -1;
     }
+    fread(&jpegbuffer, sizeof(jpegbuffer), , file);
 
     jpeg_create_decompress(&in_info);
     jpeg_stdio_src(&in_info, infile);

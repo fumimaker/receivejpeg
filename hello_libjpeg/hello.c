@@ -13,6 +13,7 @@
 ////////////// NOT WORKING ////////////
 
 
+
 int main (){
     struct jpeg_decompress_struct in_info;
     struct jpeg_error_mgr jpeg_error;
