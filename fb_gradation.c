@@ -84,33 +84,34 @@ int main(int argc, char **argv){
             // } else if(x<casenum*7) {
             //     color = 0x00000000;
             // }
-            // switch(pattern){
-            //     case 0:
-            //         color = 0x00FFFFFF;
-            //         break;
-            //     case 1:
-            //         color = 0x00FFFF00;
-            //         break;
-            //     case 2:
-            //         color = 0x0000FFFF;
-            //         break;
-            //     case 3:
-            //         color = 0x0000FF00;
-            //         break;
-            //     case 4:
-            //         color = 0x00FF00FF;
-            //         break;
-            //     case 5:
-            //         color = 0x00FF0000;
-            //         break;
-            //     case 6:
-            //         color = 0x000000FF;
-            //         break;
-            //     case 7:
-            //         color = 0x00000000;
-            //         break;
-            // }
-            buf[y*xres + x] = 0xFFFFFFFF;
+            int pattern = x/(xres/8);
+            switch(pattern){
+                case 0:
+                    color = 0x00FFFFFF;
+                    break;
+                case 1:
+                    color = 0x00FFFF00;
+                    break;
+                case 2:
+                    color = 0x0000FFFF;
+                    break;
+                case 3:
+                    color = 0x0000FF00;
+                    break;
+                case 4:
+                    color = 0x00FF00FF;
+                    break;
+                case 5:
+                    color = 0x00FF0000;
+                    break;
+                case 6:
+                    color = 0x000000FF;
+                    break;
+                case 7:
+                    color = 0x00000000;
+                    break;
+            }
+            buf[y*xres + x] = color;
             //printf("x:%d y:%d\n", x, y);
         }
     }
