@@ -17,12 +17,14 @@
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <jpeglib.h>
+#include <sys/stat.h>
 
 #define DEVICE_NAME "/dev/fb0"
 #define HEIGHT 720
 #define WIDTH 1280
 #define DEPTH 3
-#define in_file_name "nekomaru720.jpg"
+#define in_file_name "0076.bin"
+#define headername "headerout.bin"
 
 void print_diff_time(struct timeval start_time, struct timeval end_time) {
     struct timeval diff_time;
@@ -60,50 +62,98 @@ int main(int argc, char **argv){
     JSAMPROW row;
     struct stat sb;
     struct timeval start_time, end_time;
-    unsigned char jpegbuffer[0x100000];//1MByte
+
     in_info.err = jpeg_std_error(&jpeg_error);
 
+    unsigned char binbuffer[0x100000]; //1MByte
+    unsigned char headerbuffer[1024];
+    unsigned char mem[0x100000];
+    unsigned char eof[2] = {0xFF, 0xD9};
+    unsigned char writebuffer[0x2A3000]; //2MByte
 
-    FILE *infile;
-    if ((infile = fopen(in_file_name, "rb")) == NULL) {
-        fprintf(stderr, "ファイルが開けません: %s\n", in_file_name);
+    int sizeofbin, sizeofheader;
+    int address_counter = 0;
+
+    FILE *fp_header = fopen(headername, "rb");
+    if (fp_header == NULL) {
+        printf("no header file.\n");
         return -1;
     }
+    if (stat(headername, &sb) == -1) {
+        perror("stat");
+        exit(EXIT_FAILURE);
+    }
+    sizeofheader = sb.st_size;
+    fread(headerbuffer, sizeof(unsigned char), sizeofheader, fp_header);
+    printf("sizeofheader:%d bytes\n", sizeofheader);
     gettimeofday(&start_time, NULL);
-    jpeg_create_decompress(&in_info);
-    jpeg_stdio_src(&in_info, infile);
 
-    jpeg_read_header(&in_info, TRUE);
-    jpeg_start_decompress(&in_info);
-
-    printf("in_info.output_height:%d in_info.output_components:%d\n",
-           in_info.output_height, in_info.output_components);
-
-    int stride =
-        sizeof(JSAMPLE) * in_info.output_width * in_info.output_components;
-    printf("stride:%d \n", stride);
-
-    if ((buffer = (unsigned char *)calloc(stride, 1)) == NULL) {
-        perror("calloc error");
-    }
+    memcpy(mem, headerbuffer, sizeofheader);
 
 
-    unsigned char img[WIDTH * HEIGHT * DEPTH];
+    for(int i=90; i<180; i++){
+        char moji[32];
+        sprintf(moji, "bininput/%04d.bin", i);
 
-    for (int i = 0; i < in_info.output_height; i++) {
-        jpeg_read_scanlines(&in_info, &buffer, 1);
-        row = buffer;
-
-        for (int k = 0; k < stride; k++) {
-            img[k + i * stride] = *row++;
-            // printf("height:%d width:%d addr:%d data:0x%06x\n", i, k, k + i * stride, img[k + i*stride]);
+        FILE *fp = fopen(moji, "rb");
+        if (fp == NULL) {
+            printf("no file.\n");
+            return -1;
         }
+        if (stat(moji, &sb) == -1) {
+            perror("stat");
+            exit(EXIT_FAILURE);
+        }
+        sizeofbin = sb.st_size;
+        fread(binbuffer, sizeof(unsigned char), sizeofbin, fp);
+
+        memcpy(mem + sizeofheader, binbuffer, sizeofbin);
+        memcpy(mem + sizeofheader + sizeofbin, eof, 2);
+
+
+
+        jpeg_create_decompress(&in_info);
+        jpeg_mem_src(&in_info, mem, sizeofheader + sizeofbin + 2);
+
+        jpeg_read_header(&in_info, TRUE);
+        jpeg_start_decompress(&in_info);
+
+        // printf("in_info.output_height:%d in_info.output_components:%d\n", in_info.output_height, in_info.output_components);
+
+        int stride =
+            sizeof(JSAMPLE) * in_info.output_width * in_info.output_components;
+
+        if ((buffer = (unsigned char *)calloc(stride, 1)) == NULL) {
+            perror("calloc error");
+        }
+
+        unsigned char img[WIDTH * HEIGHT * DEPTH];
+
+        for (int i = 0; i < in_info.output_height; i++) {
+            jpeg_read_scanlines(&in_info, &buffer, 1);
+            row = buffer;
+            for (int k = 0; k < stride; k++) {
+                img[k + i * stride] = *row++;
+            }
+        }
+        jpeg_finish_decompress(&in_info);
+        jpeg_destroy_decompress(&in_info);
+        free(buffer);
+        memcpy(writebuffer+address_counter, img, in_info.output_height*stride);
+        address_counter += in_info.output_height * stride;
+        printf("addr:%d\n", address_counter);
+        fclose(fp);
     }
-    jpeg_finish_decompress(&in_info);
-    jpeg_destroy_decompress(&in_info);
     gettimeofday(&end_time, NULL);
     print_diff_time(start_time, end_time);
-    free(buffer);
+
+    FILE *file = fopen("rawframe.raw", "wb");
+    if (file == NULL) {
+        printf("no file.\n");
+        return -1;
+    }
+    fwrite(writebuffer, 1, 1280*720*3, file);
+    fclose(file);
 
 
 
@@ -137,16 +187,15 @@ int main(int argc, char **argv){
     }
     for(int y=0; y<720; y++){
         for(x=0; x<1176; x++){
-            buf[y*xres + x] = img[ 1280*3*y + x*3 +0]<<16|
-                            img[ 1280*3*y + x*3 +1]<<8|
-                            img[ 1280*3*y + x*3 +2];
+            buf[y*xres + x] = writebuffer[ 1280*3*y + x*3 +0]<<16|
+                            writebuffer[ 1280*3*y + x*3 +1]<<8|
+                            writebuffer[ 1280*3*y + x*3 +2];
         }
     }
 
 
     msync(buf, screensize, 0);
     munmap(buf, screensize);
-    fclose(infile);
     close(fd);
     return 0;
 }
