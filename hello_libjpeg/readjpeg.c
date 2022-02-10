@@ -3,11 +3,26 @@
 #include <string.h>
 #include <jpeglib.h>
 #include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <time.h>
 
 #define HEIGHT 720
 #define WIDTH 1280
 #define DEPTH 3
 #define in_file_name "input.jpg"
+
+void print_diff_time(struct timeval start_time, struct timeval end_time) {
+    struct timeval diff_time;
+    if (end_time.tv_usec < start_time.tv_usec) {
+        diff_time.tv_sec = end_time.tv_sec - start_time.tv_sec - 1;
+        diff_time.tv_usec = end_time.tv_usec - start_time.tv_usec + 1000 * 1000;
+    } else {
+        diff_time.tv_sec = end_time.tv_sec - start_time.tv_sec;
+        diff_time.tv_usec = end_time.tv_usec - start_time.tv_usec;
+    }
+    printf("time = %ld.%06ld sec\n", diff_time.tv_sec, diff_time.tv_usec);
+}
 
 int main() {
     struct jpeg_decompress_struct in_info;
@@ -15,7 +30,7 @@ int main() {
     JSAMPROW buffer = NULL;
     JSAMPROW row;
     struct stat sb;
-
+    struct timeval start_time, end_time;
     unsigned char jpegbuffer[0x100000];//1MByte
 
 
@@ -26,7 +41,7 @@ int main() {
         fprintf(stderr, "ファイルが開けません: %s\n", in_file_name);
         return -1;
     }
-
+    gettimeofday(&start_time, NULL);
     jpeg_create_decompress(&in_info);
     jpeg_stdio_src(&in_info, infile);
 
@@ -57,6 +72,8 @@ int main() {
     }
     jpeg_finish_decompress(&in_info);
     jpeg_destroy_decompress(&in_info);
+    gettimeofday(&end_time, NULL);
+    print_diff_time(start_time, end_time);
     free(buffer);
     FILE *file;
     file = fopen("test.raw", "wb");
