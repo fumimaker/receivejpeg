@@ -1,14 +1,21 @@
-#include <jpeglib.h>
+
+#include <fcntl.h>
+#include <linux/fb.h>
+#include <linux/fs.h>
 #include <netinet/in.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+#include <jpeglib.h>
 
 #define UDP_SIZE 1472
 #define UDP_HEADER 8
@@ -17,6 +24,8 @@
 #define WIDTH 1280
 #define DEPTH 3
 #define headername "headerout.bin"
+#define DEVICE_NAME "/dev/fb0"
+
 void print_diff_time(struct timeval start_time, struct timeval end_time) {
     struct timeval diff_time;
     if (end_time.tv_usec < start_time.tv_usec) {
@@ -40,15 +49,15 @@ int main() {
     int sock;
     struct sockaddr_in addr;
     struct timeval start_time, end_time;
-    char buf[2048];
-    char framebuf[1000000];  // 1Mbyte
+    char udpbuffer[2048];
     sock = socket(AF_INET, SOCK_DGRAM, 0);
 
     struct jpeg_decompress_struct in_info;
     struct jpeg_error_mgr jpeg_error;
-    JSAMPROW buffer = NULL;
+    JSAMPROW rowbuffer = NULL;
     JSAMPROW row;
     struct stat sb;
+    in_info.err = jpeg_std_error(&jpeg_error);
 
     int address_counter = 0;
     int sizeofbin, sizeofheader;
@@ -58,7 +67,41 @@ int main() {
     unsigned char eof[2] = {0xFF, 0xD9};
     unsigned char writebuffer[0x2A3000];  // 2MByte
 
-    in_info.err = jpeg_std_error(&jpeg_error);
+    int fd = 0;
+    int screensize;
+    int x, y, col;
+    int r, g, b;
+    fd = OpenFrameBuffer(fd);
+    struct fb_var_screeninfo vinfo;
+    struct fb_fix_screeninfo finfo;
+
+    if (ioctl(fd, FBIOGET_FSCREENINFO, &finfo)) {
+        fprintf(stderr, "cannot open fix info\n");
+        exit(1);
+    }
+    if (ioctl(fd, FBIOGET_VSCREENINFO, &vinfo)) {
+        fprintf(stderr, "cannot open variable info\n");
+        exit(1);
+    }
+
+    int xres, yres, bpp, line_len;
+    xres = vinfo.xres;
+    yres = vinfo.yres;
+    bpp = vinfo.bits_per_pixel;
+    line_len = finfo.line_length;
+
+    screensize = yres * xres * bpp / 8;
+    printf("screen size: %d\n", screensize);
+    printf(
+        "RECVFRAM Atlys Ver0.1\n%d(pixel)x%d(line), %d(bit per pixel), %d(line "
+        "length)\n", xres, yres, bpp, line_len);
+
+    uint32_t *fb_buf;
+    if ((fb_buf = (uint32_t *)mmap(NULL, screensize, PROT_READ | PROT_WRITE,
+                                MAP_SHARED, fd, 0)) < 0) {
+        fprintf(stderr, "cannot get framebuffer");
+        exit(1);
+    }
 
     FILE *fp_header = fopen(headername, "rb");
     if (fp_header == NULL) {
@@ -85,10 +128,10 @@ int main() {
     uint8_t local_id = 0;
     uint32_t global_id = 0, size = 0;
 
-    memset(buf, 0, sizeof(buf));
-    memset(framebuf, 0, sizeof(framebuf));
-    uint32_t *buf_32 = (uint32_t *)buf;
-    uint32_t *framebuf_32 = (uint32_t *)framebuf;
+    memset(udpbuffer, 0, sizeof(udpbuffer));
+    memset(binbuffer, 0, sizeof(binbuffer));
+    uint32_t *buf_32 = (uint32_t *)udpbuffer;
+    uint32_t *framebuf_32 = (uint32_t *)binbuffer;
     int wari = 0, amari = 0;
     // フレームループ
     for (int k = 0; k < 30; k++) {
@@ -98,7 +141,7 @@ int main() {
             int bufcounter = 0;
             // 1280*8の画像ループ
             while (flg) {
-                int received = recv(sock, buf, sizeof(buf), 0) - 8;
+                int received = recv(sock, udpbuffer, sizeof(udpbuffer), 0) - 8;
                 global_id = buf_32[0];
                 size = buf_32[1] & 0x00FFFFFF;
                 local_id = (buf_32[1] >> 24) & 0xFF;
@@ -111,11 +154,9 @@ int main() {
                 for (int i = 0; i < received / 4; i++) {
                     framebuf_32[i + (bufcounter / 4)] = htonl(buf_32[i + 2]);
                 }
-                // memcpy(framebuf, buf+bufcounter+8, received);
                 bufcounter += received;
                 if (local_id == wari) {
                     flg = 0;
-                    // printf("nuke\n");
                 }
                 if ((amari == 0) && (local_id == (wari - 1))) {
                     flg = 0;
@@ -126,7 +167,7 @@ int main() {
             // headerを書く
             memcpy(mem, headerbuffer, sizeofheader);
             //内容を書く
-            memcpy(mem + sizeofheader, framebuf, bufcounter);
+            memcpy(mem + sizeofheader, binbuffer, bufcounter);
             // EOFマーカーを書く
             memcpy(mem + sizeofheader + bufcounter, eof, 2);
 
@@ -142,61 +183,41 @@ int main() {
             int stride = sizeof(JSAMPLE) * in_info.output_width *
                          in_info.output_components;
 
-            if ((buffer = (unsigned char *)calloc(stride, 1)) == NULL) {
+            if ((rowbuffer = (unsigned char *)calloc(stride, 1)) == NULL) {
                 perror("calloc error");
             }
 
             unsigned char img[WIDTH * HEIGHT * DEPTH];
 
             for (int i = 0; i < in_info.output_height; i++) {
-                jpeg_read_scanlines(&in_info, &buffer, 1);
-                row = buffer;
+                jpeg_read_scanlines(&in_info, &rowbuffer, 1);
+                row = rowbuffer;
                 for (int k = 0; k < stride; k++) {
                     img[k + i * stride] = *row++;
                 }
             }
             jpeg_finish_decompress(&in_info);
             jpeg_destroy_decompress(&in_info);
-            free(buffer);
-            memcpy(writebuffer + address_counter, img,
-                   in_info.output_height * stride);
-            address_counter += in_info.output_height * stride;
+            free(rowbuffer);
+            for (int y = 0; y < 8; y++) {
+                for (x = 0; x < 1176; x++) {
+                    fb_buf[y * xres + x] = img[1280 * 3 * y + x * 3 + 0] << 16 |
+                                           img[1280 * 3 * y + x * 3 + 1] << 8 |
+                                           img[1280 * 3 * y + x * 3 + 2];
+                }
+            }
+            msync(fb_buf, screensize, 0);
+            // memcpy(writebuffer + address_counter, img,
+            //        in_info.output_height * stride);
+            // address_counter += in_info.output_height * stride;
             gettimeofday(&end_time, NULL);
-            printf("addr:%d\n", address_counter);
+
         }
-        char moji[32];
-        sprintf(moji, "rawout/udp%04d.raw", k);
-        FILE *file = fopen(moji, "wb");
-        if (file == NULL) {
-            printf("no file.\n");
-            return -1;
-        }
-        fwrite(writebuffer, 1, 1280 * 720 * 3, file);
-        fclose(file);
+        printf("addr:%d\n", address_counter);
     }
 
     print_diff_time(start_time, end_time);
-
-    // uint32_t dma_addr = 0;
-    // int address=0;
-    // for(int i=0; i<cnt; i++){
-    // 	char moji[32];
-    // 	sprintf(moji, "binout/%03d.bin", i);
-    // 	FILE* fp = fopen(moji, "wb");
-    // 	for (int j = 0; j < addrbuf[i]; j = j + 4) { // 4byteやってる
-    // 		unsigned char buffer[4];
-    // 		buffer[0] = outbuf.buf[3 + j + address];
-    // 		buffer[1] = outbuf.buf[2 + j + address];
-    // 		buffer[2] = outbuf.buf[1 + j + address];
-    // 		buffer[3] = outbuf.buf[0 + j + address];
-    // 		int n = fwrite(buffer, sizeof(unsigned char), 4, fp);
-    // 	}
-    // 	printf("write:%d addrbuf:%u\n", i, addrbuf[i]);
-    // 	address = address + addrbuf[i];
-    // 	fclose(fp);
-    // }
-
     close(sock);
-
+    munmap(fb_buf, screensize);
     return 0;
 }
