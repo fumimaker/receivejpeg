@@ -134,7 +134,7 @@ int main() {
     uint32_t *framebuf_32 = (uint32_t *)binbuffer;
     int wari = 0, amari = 0;
     // フレームループ
-    for (int k = 0; k < 30; k++) {
+    for (int k = 0; k < 1000; k++) {
         // 1280*8*90 Loop
         address_counter = 0;
         for (int j = 0; j < 90; j++) {
@@ -187,7 +187,7 @@ int main() {
                 perror("calloc error");
             }
 
-            unsigned char img[WIDTH * HEIGHT * DEPTH];
+            unsigned char img[WIDTH * 8 * DEPTH]; //8lineしかないので
 
             for (int i = 0; i < in_info.output_height; i++) {
                 jpeg_read_scanlines(&in_info, &rowbuffer, 1);
@@ -199,7 +199,7 @@ int main() {
             jpeg_finish_decompress(&in_info);
             jpeg_destroy_decompress(&in_info);
             free(rowbuffer);
-            for (int y = 0; y < 8; y++) {
+            for (int y = j*8; y < j*8+8; y++) {
                 for (x = 0; x < 1176; x++) {
                     fb_buf[y * xres + x] = img[1280 * 3 * y + x * 3 + 0] << 16 |
                                            img[1280 * 3 * y + x * 3 + 1] << 8 |
