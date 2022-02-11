@@ -65,7 +65,7 @@ int main()
         exit(EXIT_FAILURE);
     }
     sizeofheader = sb.st_size;
-    fread(headerbuffer, sizeof(unsigned char), sizeofheader, fp_header);
+    int temp=fread(headerbuffer, sizeof(unsigned char), sizeofheader, fp_header);
     printf("sizeofheader:%d bytes\n", sizeofheader);
     fclose(fp_header);
 
@@ -86,8 +86,9 @@ int main()
     int wari = 0, amari = 0;
     // フレームループ
     for(int k=0; k<3; k++) {
-        //1280*8*90ループ
-        for(int j=0; j<90; j++) {
+        //1280*8*90 Loop
+        address_counter = 0;
+        for (int j = 0; j < 90; j++) {
             int bufcounter = 0;
             // 1280*8の画像ループ
             while(flg){
@@ -154,8 +155,9 @@ int main()
             address_counter += in_info.output_height * stride;
             printf("addr:%d\n", address_counter);
         }
-
-        FILE *file = fopen("rawframe.raw", "wb");
+        char moji[32];
+        sprintf(moji, "udp%04d.raw", k);
+        FILE *file = fopen(moji, "wb");
         if (file == NULL) {
             printf("no file.\n");
             return -1;
