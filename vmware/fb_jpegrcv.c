@@ -130,11 +130,15 @@ int main() {
 
     memset(udpbuffer, 0, sizeof(udpbuffer));
     memset(binbuffer, 0, sizeof(binbuffer));
+
+    // headerを書く
+    memcpy(mem, headerbuffer, sizeofheader);
+
     uint32_t *buf_32 = (uint32_t *)udpbuffer;
     uint32_t *framebuf_32 = (uint32_t *)binbuffer;
     int wari = 0, amari = 0;
     // フレームループ
-    for (int k = 0; k < 1000; k++) {
+    for (int k = 0; k < 10000; k++) {
         // 1280*8*90 Loop
         address_counter = 0;
         for (int j = 0; j < 90; j++) {
@@ -164,8 +168,7 @@ int main() {
             }
             gettimeofday(&start_time, NULL);
             flg = 1;
-            // headerを書く
-            memcpy(mem, headerbuffer, sizeofheader);
+
             //内容を書く
             memcpy(mem + sizeofheader, binbuffer, bufcounter);
             // EOFマーカーを書く
@@ -199,11 +202,12 @@ int main() {
             jpeg_finish_decompress(&in_info);
             jpeg_destroy_decompress(&in_info);
             free(rowbuffer);
-            for (int y = j*8; y < j*8+8; y++) {
-                for (x = 0; x < 1176; x++) {
-                    fb_buf[y * xres + x] = img[1280 * 3 * y + x * 3 + 0] << 16 |
-                                           img[1280 * 3 * y + x * 3 + 1] << 8 |
-                                           img[1280 * 3 * y + x * 3 + 2];
+            for (int y = 0; y < 8; y++) {
+                for (int x = 0; x < 1176; x++) {
+                    fb_buf[y * xres + x + 1176 * 8 * j] =
+                        img[1280 * 3 * y + x * 3 + 0] << 16 |
+                        img[1280 * 3 * y + x * 3 + 1] << 8 |
+                        img[1280 * 3 * y + x * 3 + 2];
                 }
             }
             msync(fb_buf, screensize, 0);
@@ -211,12 +215,12 @@ int main() {
             //        in_info.output_height * stride);
             // address_counter += in_info.output_height * stride;
             gettimeofday(&end_time, NULL);
-
+            print_diff_time(start_time, end_time);
         }
-        printf("addr:%d\n", address_counter);
+        //printf("addr:%d\n", address_counter);
     }
 
-    print_diff_time(start_time, end_time);
+
     close(sock);
     munmap(fb_buf, screensize);
     return 0;
