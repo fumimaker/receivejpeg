@@ -159,7 +159,7 @@ int main() {
     // フレームループ
 
     unsigned int framecounter = 0;
-    for (int k = 0; k < 10000; k++) {
+    for (unsigned int k = 0; k < 0xFFFFFFFF; k++) {
         // 1280*8*90 Loop
 
         for (int j = 0; j < 90; j++) {//もはや意味ないけど
@@ -180,14 +180,14 @@ int main() {
                     bufcounter = 0;
                 }
 
-                //printf("received:%d global_id:%u size:%u local:%u bufcounter:%d\n", received, global_id, size, local_id, bufcounter);
+                printf("received:%d global_id:%u size:%u local:%u bufcounter:%d\n", received, global_id, size, local_id, bufcounter);
                 for (int i = 0; i < received / 4; i++) {
                     framebuf_32[i + (bufcounter / 4)] = htonl(buf_32[i + 2]);
                 }
                 bufcounter += received;
 
                 if(framecounter != global_id) {
-                    //printf("broken: framecnt:%d global:%d\n", framecounter, global_id);
+                    printf("broken: framecnt:%d global:%d\n", framecounter, global_id);
                     broken = 1;
                 }
 
