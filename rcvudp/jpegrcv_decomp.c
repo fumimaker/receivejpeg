@@ -85,7 +85,7 @@ int main()
     uint32_t *framebuf_32 = (uint32_t *)framebuf;
     int wari = 0, amari = 0;
     // フレームループ
-    for(int k=0; k<3; k++) {
+    for(int k=0; k<30; k++) {
         //1280*8*90 Loop
         address_counter = 0;
         for (int j = 0; j < 90; j++) {
@@ -113,6 +113,7 @@ int main()
                     flg = 0;
                 }
             }
+            gettimeofday(&start_time, NULL);
             flg = 1;
             // headerを書く
             memcpy(mem, headerbuffer, sizeofheader);
@@ -153,10 +154,11 @@ int main()
             memcpy(writebuffer + address_counter, img,
                    in_info.output_height * stride);
             address_counter += in_info.output_height * stride;
+            gettimeofday(&end_time, NULL);
             printf("addr:%d\n", address_counter);
         }
         char moji[32];
-        sprintf(moji, "udp%04d.raw", k);
+        sprintf(moji, "rawout/udp%04d.raw", k);
         FILE *file = fopen(moji, "wb");
         if (file == NULL) {
             printf("no file.\n");
