@@ -6,12 +6,17 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <time.h>
+#include <stdlib.h>
 #include <jpeglib.h>
+#include <sys/stat.h>
 
 #define UDP_SIZE 1472
 #define UDP_HEADER 8
 #define UDP_DATASIZE (UDP_SIZE - UDP_HEADER)
-
+#define HEIGHT 720
+#define WIDTH 1280
+#define DEPTH 3
+#define headername "headerout.bin"
 void print_diff_time(struct timeval start_time, struct timeval end_time) {
 	struct timeval diff_time;
 	if (end_time.tv_usec < start_time.tv_usec) {
@@ -39,7 +44,7 @@ int main()
     JSAMPROW buffer = NULL;
     JSAMPROW row;
     struct stat sb;
-    struct timeval start_time, end_time;
+
     int address_counter = 0;
     int sizeofbin, sizeofheader;
     unsigned char binbuffer[0x100000];  // 1MByte
@@ -62,7 +67,7 @@ int main()
     sizeofheader = sb.st_size;
     fread(headerbuffer, sizeof(unsigned char), sizeofheader, fp_header);
     printf("sizeofheader:%d bytes\n", sizeofheader);
-
+    fclose(fp_header);
 
     addr.sin_family = AF_INET;
     addr.sin_port = htons(12345);
@@ -111,7 +116,7 @@ int main()
             // headerを書く
             memcpy(mem, headerbuffer, sizeofheader);
             //内容を書く
-            memcpy(mem + sizeofheader, framebuffer, bufcounter);
+            memcpy(mem + sizeofheader, framebuf, bufcounter);
             // EOFマーカーを書く
             memcpy(mem + sizeofheader + bufcounter, eof, 2);
 
@@ -148,7 +153,6 @@ int main()
                    in_info.output_height * stride);
             address_counter += in_info.output_height * stride;
             printf("addr:%d\n", address_counter);
-            fclose(fp);
         }
 
         FILE *file = fopen("rawframe.raw", "wb");
