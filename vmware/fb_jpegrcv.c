@@ -153,86 +153,110 @@ int main() {
     uint32_t *buf_32 = (uint32_t *)udpbuffer;
     uint32_t *framebuf_32 = (uint32_t *)binbuffer;
     int wari = 0, amari = 0;
+    // printf("received:%d global_id:%u size:%u local:%u
+    // bufcounter:%d\n", received, global_id, size, local_id,
+    // bufcounter);
     // フレームループ
+
+    unsigned int framecounter = 0;
     for (int k = 0; k < 10000; k++) {
         // 1280*8*90 Loop
-        address_counter = 0;
-        for (int j = 0; j < 90; j++) {
+
+        for (int j = 0; j < 90; j++) {//もはや意味ないけど
             int bufcounter = 0;
+            int broken = 0;
             // 1280*8の画像ループ
             while (flg) {
                 int received = recv(sock, udpbuffer, sizeof(udpbuffer), 0) - 8;
                 global_id = buf_32[0];
                 size = buf_32[1] & 0x00FFFFFF;
                 local_id = (buf_32[1] >> 24) & 0xFF;
-                // printf("received:%d global_id:%u size:%u local:%u
-                // bufcounter:%d\n", received, global_id, size, local_id,
-                // bufcounter);
-                wari = size / UDP_DATASIZE;
-                amari = size - (wari * UDP_DATASIZE);  // amari = size%UDP_DATA;
 
+                if(local_id==0){
+                    wari = size / UDP_DATASIZE;
+                    amari = size - (wari * UDP_DATASIZE);
+                    // amari = size%UDP_DATA;
+                    framecounter = global_id;
+                    bufcounter = 0;
+                }
+
+                //printf("received:%d global_id:%u size:%u local:%u bufcounter:%d\n", received, global_id, size, local_id, bufcounter);
                 for (int i = 0; i < received / 4; i++) {
                     framebuf_32[i + (bufcounter / 4)] = htonl(buf_32[i + 2]);
                 }
                 bufcounter += received;
+
+                if(framecounter != global_id) {
+                    //printf("broken: framecnt:%d global:%d\n", framecounter, global_id);
+                    broken = 1;
+                }
+
                 if (local_id == wari) {
                     flg = 0;
+                    if (size != bufcounter) {
+                        broken = 1;
+                    }
                 }
                 if ((amari == 0) && (local_id == (wari - 1))) {
                     flg = 0;
+                    if (size != bufcounter) {
+                        broken = 1;
+                    }
                 }
             }
+            framecounter++;
             // gettimeofday(&start_time, NULL);
             flg = 1;
 
-            //内容を書く
-            memcpy(mem + sizeofheader, binbuffer, bufcounter);
-            // EOFマーカーを書く
-            memcpy(mem + sizeofheader + bufcounter, eof, 2);
+            if(broken==0){
+                //内容を書く
+                memcpy(mem + sizeofheader, binbuffer, bufcounter);
+                // EOFマーカーを書く
+                memcpy(mem + sizeofheader + bufcounter, eof, 2);
 
-            jpeg_create_decompress(&in_info);
-            jpeg_mem_src(&in_info, mem, sizeofheader + bufcounter + 2);
+                jpeg_create_decompress(&in_info);
+                jpeg_mem_src(&in_info, mem, sizeofheader + bufcounter + 2);
 
-            jpeg_read_header(&in_info, TRUE);
-            jpeg_start_decompress(&in_info);
+                jpeg_read_header(&in_info, TRUE);
+                jpeg_start_decompress(&in_info);
 
-            // printf("in_info.output_height:%d in_info.output_components:%d\n",
-            // in_info.output_height, in_info.output_components);
+                // printf("in_info.output_height:%d
+                // in_info.output_components:%d\n", in_info.output_height,
+                // in_info.output_components);
 
-            int stride = sizeof(JSAMPLE) * in_info.output_width *
-                         in_info.output_components;
+                int stride = sizeof(JSAMPLE) * in_info.output_width *
+                             in_info.output_components;
 
-            if ((rowbuffer = (unsigned char *)calloc(stride, 1)) == NULL) {
-                perror("calloc error");
-            }
-
-            unsigned char img[WIDTH * 8 * DEPTH]; //8lineしかないので
-
-            for (int i = 0; i < in_info.output_height; i++) {
-                jpeg_read_scanlines(&in_info, &rowbuffer, 1);
-                row = rowbuffer;
-                for (int k = 0; k < stride; k++) {
-                    img[k + i * stride] = *row++;
+                if ((rowbuffer = (unsigned char *)calloc(stride, 1)) == NULL) {
+                    perror("calloc error");
                 }
-            }
-            jpeg_finish_decompress(&in_info);
-            jpeg_destroy_decompress(&in_info);
-            free(rowbuffer);
-            int position = global_id % 90;
-            for (int y = 0; y < 8; y++) {
-                for (int x = 0; x < 1176; x++) {
-                    fb_buf[y * xres + x + 1176 * 8 * position] =
-                        img[1280 * 3 * y + x * 3 + 0] << 16 |
-                        img[1280 * 3 * y + x * 3 + 1] << 8 |
-                        img[1280 * 3 * y + x * 3 + 2];
-                }
-            }
-            msync(fb_buf, screensize, 0);
 
+                unsigned char img[WIDTH * 8 * DEPTH];  // 8lineしかないので
+
+                for (int i = 0; i < in_info.output_height; i++) {
+                    jpeg_read_scanlines(&in_info, &rowbuffer, 1);
+                    row = rowbuffer;
+                    for (int k = 0; k < stride; k++) {
+                        img[k + i * stride] = *row++;
+                    }
+                }
+                jpeg_finish_decompress(&in_info);
+                jpeg_destroy_decompress(&in_info);
+                free(rowbuffer);
+                int position = global_id % 90;
+                for (int y = 0; y < 8; y++) {
+                    for (int x = 0; x < 1176; x++) {
+                        fb_buf[y * xres + x + 1176 * 8 * position] =
+                            img[1280 * 3 * y + x * 3 + 0] << 16 |
+                            img[1280 * 3 * y + x * 3 + 1] << 8 |
+                            img[1280 * 3 * y + x * 3 + 2];
+                    }
+                }
+                msync(fb_buf, screensize, 0);
+            }
             //gettimeofday(&end_time, NULL);
             //print_diff_time(start_time, end_time);
         }
-        //printf("addr:%d\n", address_counter);
     }
 
 
