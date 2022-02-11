@@ -17,7 +17,7 @@ void print_diff_time(struct timeval start_time, struct timeval end_time) {
 		diff_time.tv_sec = end_time.tv_sec - start_time.tv_sec;
 		diff_time.tv_usec = end_time.tv_usec - start_time.tv_usec;
 	}
-	printf("time = %ld.%06d sec\n", diff_time.tv_sec, diff_time.tv_usec);
+	printf("time = %ld.%06ld sec\n", diff_time.tv_sec, diff_time.tv_usec);
 }
 int main()
 {
@@ -25,7 +25,7 @@ int main()
 	struct sockaddr_in addr;
     struct timeval start_time, end_time;
 	char buf[2048];
-	char framebuf[1000000];
+	char framebuf[1000000];//1Mbyte
 	sock = socket(AF_INET, SOCK_DGRAM, 0);
 
 	addr.sin_family = AF_INET;
@@ -68,7 +68,7 @@ int main()
             }
 
             char moji[32];
-            sprintf(moji, "binout/%03d.bin", global_id);
+            sprintf(moji, "binout/%04d.bin", global_id);
             FILE* fp = fopen(moji, "wb");
             int n = fwrite(framebuf, sizeof(char), bufcounter, fp);
             fclose(fp);
