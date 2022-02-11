@@ -16,6 +16,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <jpeglib.h>
+#include <setjmp.h>
 
 #define UDP_SIZE 1472
 #define UDP_HEADER 8
@@ -25,6 +26,17 @@
 #define DEPTH 3
 #define headername "headerout.bin"
 #define DEVICE_NAME "/dev/fb0"
+
+typedef struct my_error_mgr {
+    struct jpeg_error_mgr jerr;
+    jmp_buf jmpbuf;
+} my_error_mgr;
+
+static void error_exit(j_common_ptr cinfo) {
+    my_error_mgr *err = (my_error_mgr *)cinfo->err;
+    (*cinfo->err->output_message)(cinfo);
+    longjmp(err->jmpbuf, 1);
+}
 
 void print_diff_time(struct timeval start_time, struct timeval end_time) {
     struct timeval diff_time;
@@ -53,12 +65,16 @@ int main() {
     sock = socket(AF_INET, SOCK_DGRAM, 0);
 
     struct jpeg_decompress_struct in_info;
-    struct jpeg_error_mgr jpeg_error;
+    // struct jpeg_error_mgr jpeg_error;
     JSAMPROW rowbuffer = NULL;
     JSAMPROW row;
     struct stat sb;
-    in_info.err = jpeg_std_error(&jpeg_error);
-
+    my_error_mgr myerr;
+    in_info.err = jpeg_std_error(&myerr.jerr);
+    myerr.jerr.error_exit = error_exit;
+    if (setjmp(myerr.jmpbuf)) {
+        goto error;
+    }
     int address_counter = 0;
     int sizeofbin, sizeofheader;
     unsigned char binbuffer[0x100000];  // 1MByte
@@ -166,7 +182,7 @@ int main() {
                     flg = 0;
                 }
             }
-            gettimeofday(&start_time, NULL);
+            // gettimeofday(&start_time, NULL);
             flg = 1;
 
             //内容を書く
@@ -212,11 +228,9 @@ int main() {
                 }
             }
             msync(fb_buf, screensize, 0);
-            // memcpy(writebuffer + address_counter, img,
-            //        in_info.output_height * stride);
-            // address_counter += in_info.output_height * stride;
-            gettimeofday(&end_time, NULL);
-            print_diff_time(start_time, end_time);
+
+            //gettimeofday(&end_time, NULL);
+            //print_diff_time(start_time, end_time);
         }
         //printf("addr:%d\n", address_counter);
     }
@@ -225,4 +239,9 @@ int main() {
     close(sock);
     munmap(fb_buf, screensize);
     return 0;
-}
+
+    error:
+        jpeg_destroy_decompress(&in_info);
+        free(rowbuffer);
+        printf("error occured\n");
+    }
