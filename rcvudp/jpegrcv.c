@@ -43,7 +43,7 @@ int main()
 	uint32_t *buf_32 = (uint32_t *)buf;
 	uint32_t *framebuf_32 = (uint32_t *)framebuf;
     // フレームループ
-    for(int k=0; k<2; k++){
+    for(int k=0; k<10; k++){
         //1280*8*90ループ
         for(int j=0; j<90; j++){
             int bufcounter = 0;
@@ -61,7 +61,7 @@ int main()
                 gettimeofday(&end_time, NULL);
                 //memcpy(framebuf, buf+bufcounter+8, received);
                 bufcounter += received;
-                if(local_id==(size/1464)){
+                if(local_id==(size/1464)){ //1464でなければなのでピッタリだとだめじゃん
                     flg = 0;
                     printf("nuke\n");
                 }
