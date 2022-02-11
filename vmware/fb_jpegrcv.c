@@ -202,9 +202,10 @@ int main() {
             jpeg_finish_decompress(&in_info);
             jpeg_destroy_decompress(&in_info);
             free(rowbuffer);
+            int position = global_id % 90;
             for (int y = 0; y < 8; y++) {
                 for (int x = 0; x < 1176; x++) {
-                    fb_buf[y * xres + x + 1176 * 8 * j] =
+                    fb_buf[y * xres + x + 1176 * 8 * position] =
                         img[1280 * 3 * y + x * 3 + 0] << 16 |
                         img[1280 * 3 * y + x * 3 + 1] << 8 |
                         img[1280 * 3 * y + x * 3 + 2];
