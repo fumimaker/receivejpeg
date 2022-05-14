@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <jpeglib.h>
 #include <setjmp.h>
+#include <termios.h>
 
 #define UDP_SIZE 1472
 #define UDP_HEADER 8
@@ -24,7 +25,7 @@
 #define HEIGHT 720
 #define WIDTH 1280
 #define DEPTH 3
-#define headername "headerout.bin"
+#define headername "./header/Q98headerout.bin"
 #define DEVICE_NAME "/dev/fb0"
 
 typedef struct my_error_mgr {
@@ -82,6 +83,27 @@ int main() {
     unsigned char mem[0x100000];
     unsigned char eof[2] = {0xFF, 0xD9};
     unsigned char writebuffer[0x2A3000];  // 2MByte
+
+
+    struct termios tio;  // シリアル通信設定
+    int baudRate = B115200;
+    #define SERIAL_PORT "/dev/ttyACM0"
+    int fd_serial = open(SERIAL_PORT, O_RDWR | O_SYNC);
+    if (fd_serial < 0) {
+        printf("serial open error\n");
+        //return -1;
+    }
+    tio.c_cflag += CREAD;   // 受信有効
+    tio.c_cflag += CLOCAL;  // ローカルライン（モデム制御なし）
+    tio.c_cflag += CS8;     // データビット:8bit
+    tio.c_cflag += 0;       // ストップビット:1bit
+    tio.c_cflag += 0;       // パリティ:None
+
+    cfsetispeed(&tio, baudRate);
+    cfsetospeed(&tio, baudRate);
+    cfmakeraw(&tio);  // RAWモード
+    tcsetattr(fd_serial, TCSANOW, &tio);  // デバイスに設定を行う
+    ioctl(fd_serial, TCSETS, &tio);  // ポートの設定を有効にする
 
     int fd = 0;
     int screensize;
@@ -157,7 +179,7 @@ int main() {
     // bufcounter:%d\n", received, global_id, size, local_id,
     // bufcounter);
     // フレームループ
-
+    char a[1] = {0x42};
     unsigned int framecounter = 0;
     for (unsigned int k = 0; k < 0xFFFFFFFF; k++) {
         // 1280*8*90 Loop
@@ -166,6 +188,7 @@ int main() {
             int bufcounter = 0;
             int broken = 0;
             // 1280*8の画像ループ
+            gettimeofday(&start_time, NULL);
             while (flg) {
                 int received = recv(sock, udpbuffer, sizeof(udpbuffer), 0) - 8;
                 global_id = buf_32[0];
@@ -173,6 +196,8 @@ int main() {
                 local_id = (buf_32[1] >> 24) & 0xFF;
 
                 if(local_id==0){
+                    // write(fd_serial, a, 1);
+                    // tcflush(fd_serial, TCIOFLUSH);
                     wari = size / UDP_DATASIZE;
                     amari = size - (wari * UDP_DATASIZE);
                     // amari = size%UDP_DATA;
@@ -204,11 +229,15 @@ int main() {
                     }
                 }
             }
+            gettimeofday(&end_time, NULL);
+            print_diff_time(start_time, end_time);
             framecounter++;
-            // gettimeofday(&start_time, NULL);
+
+
             flg = 1;
 
             if(broken==0){
+                // gettimeofday(&start_time, NULL);
                 //内容を書く
                 memcpy(mem + sizeofheader, binbuffer, bufcounter);
                 // EOFマーカーを書く
@@ -253,9 +282,10 @@ int main() {
                     }
                 }
                 msync(fb_buf, screensize, 0);
+                // gettimeofday(&end_time, NULL);
+                // print_diff_time(start_time, end_time);
             }
-            //gettimeofday(&end_time, NULL);
-            //print_diff_time(start_time, end_time);
+
         }
     }
 

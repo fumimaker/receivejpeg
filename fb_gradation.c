@@ -66,6 +66,7 @@ int main(int argc, char **argv){
         exit(1);
     }
     int color;
+
     for(int y=0; y<yres; y++){
         for(int x=0; x<xres; x++){
             int pattern = x/(xres/8);
@@ -99,18 +100,6 @@ int main(int argc, char **argv){
             //printf("x:%d y:%d\n", x, y);
         }
     }
-    // while (1){
-    //     for (y = 0; y < yres; ++y){
-    //         for (x = 0; x < xres; ++x){
-    //             r = (x * 256 / xres);
-    //             g = (y * 256 / yres);
-    //             *(buf + ((y * line_len / 4) + x)) = (r << 16) | (g << 8) | (b); // 00 RR GG BB
-    //         }
-    //     }
-    //     if (++b > 255){
-    //         b = 0;
-    //     }
-    // }
     msync(buf, screensize, 0);
     munmap(buf, screensize);
     close(fd);
