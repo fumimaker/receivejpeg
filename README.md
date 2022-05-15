@@ -1,6 +1,6 @@
 # receivejpeg
 受信機側のコード
-UDP受信してデコードしてFBに表示するのは `./vmware/fb_jpegrcv.c`
+UDP受信してデコードしてFBに表示するのは `gcc ./vmware/fb_jpegrcv.c -ljpeg`
 
 `fbset -i`
 `fbset -g 1280 720 1280 720 24`

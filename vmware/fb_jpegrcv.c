@@ -16,6 +16,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <jpeglib.h>
+// #include <turbojpeg.h>
 #include <setjmp.h>
 #include <termios.h>
 
@@ -205,7 +206,7 @@ int main() {
                     bufcounter = 0;
                 }
 
-                printf("received:%d global_id:%u size:%u local:%u bufcounter:%d\n", received, global_id, size, local_id, bufcounter);
+               // printf("received:%d global_id:%u size:%u local:%u bufcounter:%d\n", received, global_id, size, local_id, bufcounter);
                 for (int i = 0; i < received / 4; i++) {
                     framebuf_32[i + (bufcounter / 4)] = htonl(buf_32[i + 2]);
                 }
@@ -274,8 +275,8 @@ int main() {
                 free(rowbuffer);
                 int position = global_id % 90;
                 for (int y = 0; y < 8; y++) {
-                    for (int x = 0; x < 1176; x++) {
-                        fb_buf[y * xres + x + 1176 * 8 * position] =
+                    for (int x = 0; x < 1280; x++) {
+                        fb_buf[y * xres + x + 1920 * 8 * position] =
                             img[1280 * 3 * y + x * 3 + 0] << 16 |
                             img[1280 * 3 * y + x * 3 + 1] << 8 |
                             img[1280 * 3 * y + x * 3 + 2];

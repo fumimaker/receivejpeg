@@ -136,7 +136,7 @@ int main(int argc, char **argv){
         exit(1);
     }
     for(int y=0; y<720; y++){
-        for(x=0; x<1176; x++){
+        for(x=0; x<1280; x++){
             buf[y*xres + x] = img[ 1280*3*y + x*3 +0]<<16|
                             img[ 1280*3*y + x*3 +1]<<8|
                             img[ 1280*3*y + x*3 +2];
