@@ -49,7 +49,7 @@ void print_diff_time(struct timeval start_time, struct timeval end_time) {
         diff_time.tv_sec = end_time.tv_sec - start_time.tv_sec;
         diff_time.tv_usec = end_time.tv_usec - start_time.tv_usec;
     }
-    printf("time = %ld.%06ld sec\n", diff_time.tv_sec, diff_time.tv_usec);
+    //printf("time = %ld.%06ld sec\n", diff_time.tv_sec, diff_time.tv_usec);
 }
 int OpenFrameBuffer(int fd) {
     fd = open(DEVICE_NAME, O_RDWR);
